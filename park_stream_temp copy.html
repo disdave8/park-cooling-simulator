@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Park Stream Cooling Effect</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,700;1,9..144,300&display=swap');
+
+  :root {
+    --grass: #2d5016;
+    --grass-light: #4a7c2a;
+    --water: #1a6b8a;
+    --water-light: #4db8d8;
+    --sky: #e8f4f8;
+    --warm: #c8440a;
+    --warm-light: #f07030;
+    --cool: #1a6b8a;
+    --sand: #f5f0e8;
+    --text: #1a1a1a;
+    --muted: #555;
+    --border: #ccc;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Mono', monospace;
+    background: var(--sky);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 2rem 1rem;
+    background-image:
+      radial-gradient(ellipse at 20% 10%, rgba(77,184,216,0.18) 0%, transparent 60%),
+      radial-gradient(ellipse at 80% 80%, rgba(200,68,10,0.08) 0%, transparent 50%);
+  }
+
+  h1 {
+    font-family: 'Fraunces', serif;
+    font-weight: 700;
+    font-size: clamp(1.6rem, 5vw, 2.6rem);
+    line-height: 1.1;
+    color: var(--grass);
+    margin-bottom: 0.2rem;
+  }
+
+  .subtitle {
+    font-size: 0.78rem;
+    color: var(--muted);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 2rem;
+  }
+
+  .container { max-width: 700px; margin: 0 auto; }
+
+  /* SLIDERS */
+  .panel {
+    background: white;
+    border: 1.5px solid var(--border);
+    border-radius: 12px;
+    padding: 1.4rem 1.6rem;
+    margin-bottom: 1.2rem;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  }
+
+  .panel-title {
+    font-family: 'Fraunces', serif;
+    font-size: 0.85rem;
+    font-style: italic;
+    color: var(--muted);
+    margin-bottom: 1rem;
+    letter-spacing: 0.02em;
+  }
+
+  .slider-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 0.6rem;
+    margin-bottom: 1rem;
+  }
+
+  .slider-row:last-child { margin-bottom: 0; }
+
+  label {
+    font-size: 0.75rem;
+    color: var(--muted);
+    display: block;
+    margin-bottom: 0.3rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  input[type=range] {
+    width: 100%;
+    accent-color: var(--water);
+    cursor: pointer;
+  }
+
+  .val-badge {
+    font-size: 0.8rem;
+    font-weight: 500;
+    background: var(--sky);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.25rem 0.5rem;
+    min-width: 4.5rem;
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  /* PARK VIZ */
+  .park-viz {
+    background: white;
+    border: 1.5px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 1.2rem;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  }
+
+  .park-canvas {
+    width: 100%;
+    height: 140px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .grass-bg {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, #b8d98d 0%, #6aaa3a 100%);
+  }
+
+  .heat-overlay {
+    position: absolute;
+    inset: 0;
+    background: transparent;
+    transition: background 0.4s;
+  }
+
+  .stream {
+    position: absolute;
+    top: 0; bottom: 0;
+    background: linear-gradient(90deg, rgba(100,200,240,0.6), rgba(60,160,210,0.85), rgba(100,200,240,0.6));
+    transition: left 0.4s, width 0.4s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .stream-label {
+    font-size: 0.55rem;
+    color: white;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    writing-mode: vertical-rl;
+    opacity: 0.9;
+  }
+
+  .cool-halo {
+    position: absolute;
+    top: 0; bottom: 0;
+    background: radial-gradient(ellipse at center, rgba(60,180,220,0.22) 0%, transparent 70%);
+    transition: all 0.4s;
+    pointer-events: none;
+  }
+
+  /* temp markers */
+  .temp-markers {
+    display: flex;
+    justify-content: space-around;
+    padding: 0.7rem 1rem;
+    border-top: 1px solid var(--border);
+    background: var(--sand);
+  }
+
+  .temp-marker {
+    text-align: center;
+  }
+
+  .temp-marker .loc {
+    font-size: 0.62rem;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--muted);
+  }
+
+  .temp-marker .deg {
+    font-family: 'Fraunces', serif;
+    font-size: 1.4rem;
+    font-weight: 700;
+    line-height: 1.1;
+  }
+
+  .deg.hot { color: var(--warm); }
+  .deg.cool { color: var(--cool); }
+  .deg.mid { color: var(--grass); }
+
+  /* RESULTS */
+  .results-panel {
+    background: white;
+    border: 1.5px solid var(--border);
+    border-radius: 12px;
+    padding: 1.4rem 1.6rem;
+    margin-bottom: 1.2rem;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  }
+
+  .result-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 0.45rem 0;
+    border-bottom: 1px dashed #eee;
+    font-size: 0.78rem;
+  }
+
+  .result-row:last-child { border-bottom: none; }
+
+  .result-label { color: var(--muted); }
+
+  .result-val {
+    font-weight: 500;
+    font-size: 0.85rem;
+  }
+
+  .result-val.highlight {
+    font-family: 'Fraunces', serif;
+    font-size: 1.1rem;
+    color: var(--cool);
+  }
+
+  .result-val.hot-val { color: var(--warm); }
+
+  /* FORMULA BOX */
+  .formula-box {
+    background: #f9f7f0;
+    border-left: 3px solid var(--water);
+    border-radius: 0 8px 8px 0;
+    padding: 0.9rem 1rem;
+    margin-bottom: 1.2rem;
+    font-size: 0.72rem;
+    line-height: 1.7;
+    color: var(--muted);
+  }
+
+  .formula-box strong { color: var(--text); font-weight: 500; }
+
+  /* TOGGLE */
+  .toggle-group {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.3rem;
+  }
+
+  .toggle-btn {
+    flex: 1;
+    padding: 0.45rem 0.6rem;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.72rem;
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    background: var(--sky);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+  }
+
+  .toggle-btn.active {
+    background: var(--water);
+    border-color: var(--water);
+    color: white;
+  }
+
+  /* TREE VIZ */
+  .tree-layer {
+    position: absolute;
+    top: 0; bottom: 0;
+    pointer-events: none;
+    transition: all 0.4s;
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    font-size: 1.2rem;
+    opacity: 0;
+  }
+
+  /* NOTES */
+  .note {
+    font-size: 0.68rem;
+    color: #888;
+    line-height: 1.6;
+    text-align: center;
+    padding: 0 1rem;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Stream Cooling<br>Effect in Parks</h1>
+  <p class="subtitle">Evaporative + thermal mass cooling model</p>
+
+  <!-- INPUTS -->
+  <div class="panel">
+    <div class="panel-title">Park & Environment Parameters</div>
+
+    <div class="slider-row">
+      <div>
+        <label>Ambient air temperature</label>
+        <input type="range" id="ambientTemp" min="15" max="40" value="28" step="0.5">
+      </div>
+      <div class="val-badge" id="ambientTempVal">28.0 °C</div>
+    </div>
+
+    <div class="slider-row">
+      <div>
+        <label>Relative humidity (%)</label>
+        <input type="range" id="humidity" min="10" max="90" value="45" step="1">
+      </div>
+      <div class="val-badge" id="humidityVal">45 %</div>
+    </div>
+
+    <div class="slider-row">
+      <div>
+        <label>Park area (m²)</label>
+        <input type="range" id="parkArea" min="500" max="50000" value="10000" step="500">
+      </div>
+      <div class="val-badge" id="parkAreaVal">10,000 m²</div>
+    </div>
+
+    <div class="slider-row">
+      <div>
+        <label>Stream width (m)</label>
+        <input type="range" id="streamWidth" min="0.5" max="10" value="2" step="0.5">
+      </div>
+      <div class="val-badge" id="streamWidthVal">2.0 m</div>
+    </div>
+
+    <div class="slider-row">
+      <div>
+        <label>Stream length through park (m)</label>
+        <input type="range" id="streamLength" min="10" max="500" value="100" step="10">
+      </div>
+      <div class="val-badge" id="streamLengthVal">100 m</div>
+    </div>
+
+    <div class="slider-row">
+      <div>
+        <label>Wind speed (m/s)</label>
+        <input type="range" id="windSpeed" min="0" max="5" value="1.5" step="0.1">
+      </div>
+      <div class="val-badge" id="windSpeedVal">1.5 m/s</div>
+    </div>
+
+    <div class="slider-row">
+      <div>
+        <label>Tree canopy cover within 10m of water</label>
+        <input type="range" id="treeCanopy" min="0" max="100" value="0" step="25">
+      </div>
+      <div class="val-badge" id="treeCanopyVal">0%</div>
+    </div>
+
+    <div style="margin-top:0.8rem;">
+      <label>Water type</label>
+      <div class="toggle-group">
+        <button class="toggle-btn active" id="btnFlowing" onclick="setWaterType('flowing')">🌊 Flowing stream</button>
+        <button class="toggle-btn" id="btnStill" onclick="setWaterType('still')">🪨 Still pond</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PARK VISUALIZATION -->
+  <div class="park-viz">
+    <div class="park-canvas">
+      <div class="grass-bg"></div>
+      <div class="heat-overlay" id="heatOverlay"></div>
+      <div class="cool-halo" id="coolHalo"></div>
+      <div class="tree-layer" id="treeLayer">🌳🌳🌳🌳🌳🌳🌳🌳</div>
+      <div class="stream" id="streamViz">
+        <span class="stream-label">stream</span>
+      </div>
+    </div>
+    <div class="temp-markers">
+      <div class="temp-marker">
+        <div class="loc">No park</div>
+        <div class="deg hot" id="noParkTemp">—</div>
+      </div>
+      <div class="temp-marker">
+        <div class="loc">Park edge</div>
+        <div class="deg mid" id="parkEdgeTemp">—</div>
+      </div>
+      <div class="temp-marker">
+        <div class="loc">Near stream</div>
+        <div class="deg cool" id="nearStreamTemp">—</div>
+      </div>
+      <div class="temp-marker">
+        <div class="loc">At stream</div>
+        <div class="deg cool" id="atStreamTemp">—</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RESULTS -->
+  <div class="results-panel">
+    <div class="panel-title">Calculated Cooling Effects</div>
+
+    <div class="result-row">
+      <span class="result-label">Stream surface area</span>
+      <span class="result-val" id="streamArea">—</span>
+    </div>
+    <div class="result-row">
+      <span class="result-label">Stream area as % of park</span>
+      <span class="result-val" id="streamFraction">—</span>
+    </div>
+    <div class="result-row">
+      <span class="result-label">Evaporative cooling power</span>
+      <span class="result-val" id="evapPower">—</span>
+    </div>
+    <div class="result-row">
+      <span class="result-label">Park-wide avg temp (vs open ground)</span>
+      <span class="result-val highlight" id="parkDelta">—</span>
+    </div>
+    <div class="result-row">
+      <span class="result-label">Temp drop at stream edge (~5m)</span>
+      <span class="result-val highlight" id="nearDelta">—</span>
+    </div>
+    <div class="result-row">
+      <span class="result-label">Tree canopy cooling contribution</span>
+      <span class="result-val highlight" id="treeDelta">—</span>
+    </div>
+    <div class="result-row">
+      <span class="result-label">Effective cooling radius</span>
+      <span class="result-val" id="coolRadius">—</span>
+    </div>
+  </div>
+
+  <!-- FORMULA -->
+  <div class="formula-box">
+    <strong>How it's calculated:</strong><br>
+    <strong>1. Evaporation rate</strong> — Penman-Monteith simplified:<br>
+    E ≈ 6.43 × (1 + 0.536·u) × VPD / λ &nbsp;&nbsp;[mm/hr]<br>
+    where VPD = vapour pressure deficit, u = wind speed, λ = latent heat of vaporisation (2.45 MJ/kg)<br><br>
+    <strong>2. Cooling power</strong> — Q = E × A_stream × ρ_water × λ &nbsp;&nbsp;[W]<br><br>
+    <strong>3. Park-wide temp reduction</strong> — ΔT_park = Q / (A_park × h_conv)<br>
+    where h_conv ≈ 10–25 W/m²·K (convective heat transfer coefficient)<br><br>
+    <strong>4. Near-stream bonus</strong> — An additional 1–4 °C within ~5–20m of the stream from direct evaporative + radiative effects. Scales with stream width and local humidity deficit.
+  </div>
+
+  <p class="note">
+    Model uses simplified Penman-Monteith evaporation with a turbulent convection layer.<br>
+    Real values vary with shading, soil moisture, vegetation, and albedo.<br>
+    Typical measured values: 2–8 °C cooler near urban water features.
+  </p>
+</div>
+
+<script>
+  const inputs = {
+    ambientTemp: document.getElementById('ambientTemp'),
+    humidity: document.getElementById('humidity'),
+    parkArea: document.getElementById('parkArea'),
+    streamWidth: document.getElementById('streamWidth'),
+    streamLength: document.getElementById('streamLength'),
+    windSpeed: document.getElementById('windSpeed'),
+    treeCanopy: document.getElementById('treeCanopy'),
+  };
+
+  let waterType = 'flowing'; // 'flowing' or 'still'
+
+  function setWaterType(type) {
+    waterType = type;
+    document.getElementById('btnFlowing').classList.toggle('active', type === 'flowing');
+    document.getElementById('btnStill').classList.toggle('active', type === 'still');
+    // Update stream label and colour
+    const streamViz = document.getElementById('streamViz');
+    const streamLabel = document.querySelector('.stream-label');
+    if (type === 'still') {
+      streamViz.style.background = 'linear-gradient(90deg, rgba(80,160,200,0.5), rgba(40,120,170,0.8), rgba(80,160,200,0.5))';
+      streamLabel.textContent = 'pond';
+    } else {
+      streamViz.style.background = 'linear-gradient(90deg, rgba(100,200,240,0.6), rgba(60,160,210,0.85), rgba(100,200,240,0.6))';
+      streamLabel.textContent = 'stream';
+    }
+    calculate();
+  }
+
+  function fmt(n, dec=1) { return n.toFixed(dec); }
+  function fmtInt(n) { return Math.round(n).toLocaleString(); }
+
+  function calculate() {
+    const T = parseFloat(inputs.ambientTemp.value);
+    const RH = parseFloat(inputs.humidity.value) / 100;
+    const A_park = parseFloat(inputs.parkArea.value);
+    const W = parseFloat(inputs.streamWidth.value);
+    const L = parseFloat(inputs.streamLength.value);
+    const u = parseFloat(inputs.windSpeed.value);
+    const treePct = parseFloat(inputs.treeCanopy.value) / 100; // 0–1
+
+    // Update badges
+    document.getElementById('ambientTempVal').textContent = fmt(T) + ' °C';
+    document.getElementById('humidityVal').textContent = Math.round(RH*100) + ' %';
+    document.getElementById('parkAreaVal').textContent = fmtInt(A_park) + ' m²';
+    document.getElementById('streamWidthVal').textContent = fmt(W) + ' m';
+    document.getElementById('streamLengthVal').textContent = fmtInt(L) + ' m';
+    document.getElementById('windSpeedVal').textContent = fmt(u, 1) + ' m/s';
+    document.getElementById('treeCanopyVal').textContent = Math.round(treePct*100) + '%';
+
+    // Stream/pond area
+    const A_stream = W * L;
+
+    // Saturation vapour pressure (Tetens) kPa
+    const e_s = 0.6108 * Math.exp(17.27 * T / (T + 237.3));
+    const e_a = RH * e_s;
+    const VPD = e_s - e_a;
+
+    // --- WATER TYPE affects evaporation rate ---
+    // Flowing: full Penman turbulence factor
+    // Still: surface warms up → reduced VPD gradient, less turbulence → ~55% of flowing rate
+    const flowFactor = waterType === 'flowing' ? 1.0 : 0.55;
+
+    const lambda = 2.45;
+    const E_mm_hr = 6.43 * (1 + 0.536 * u) * VPD / lambda * flowFactor;
+    const E_ms = E_mm_hr / 1000 / 3600;
+
+    const rho_water = 1000;
+    const lambda_J = 2.45e6;
+    const Q_evap = E_ms * A_stream * rho_water * lambda_J;
+
+    // h_conv scales with wind
+    const h_conv = 10 + 5 * u;
+    const dT_park = Q_evap / (A_park * h_conv);
+
+    const nearZoneArea = Math.min(A_stream * 5, A_park * 0.3);
+    const dT_near = Q_evap / (nearZoneArea * h_conv) * 0.6 + dT_park;
+    const dT_near_capped = Math.min(dT_near, 8);
+
+    // --- TREE CANOPY cooling ---
+    // Trees within 10m zone contribute via:
+    //   1. Shade: reduces solar load ~3–5°C at 100% canopy (scales linearly)
+    //   2. Transpiration: adds ~0.5–2°C extra cooling in the zone
+    // These apply to the near-stream zone only (that's where trees are specified)
+    const dT_shade = treePct * 4.0;       // up to 4°C shade cooling
+    const dT_transpire = treePct * 1.5;   // up to 1.5°C transpiration
+    const dT_tree_zone = dT_shade + dT_transpire;
+    // Park-wide effect of trees is proportional to how much of park the zone covers
+    const zoneArea = Math.min(W * 2 * L, A_park * 0.4); // trees within 10m each side
+    const treeParkFraction = zoneArea / A_park;
+    const dT_tree_park = dT_tree_zone * treeParkFraction;
+
+    const coolRadius = Math.sqrt(Q_evap / (Math.PI * h_conv * 1.0));
+
+    // Final temperatures — trees add on top of water cooling in near zone
+    const T_nopark = T + 1.5;
+    const T_parkedge = T - dT_park * 0.4 - dT_tree_park * 0.3;
+    const T_nearstream = T - Math.min(dT_near_capped + dT_tree_zone * 0.7, 10);
+    const T_atstream = T - Math.min(dT_near_capped + dT_tree_zone, 11);
+
+    // Display results
+    document.getElementById('streamArea').textContent = fmtInt(A_stream) + ' m²';
+    document.getElementById('streamFraction').textContent = fmt(A_stream/A_park*100, 1) + '%';
+    document.getElementById('evapPower').textContent = fmtInt(Q_evap/1000) + ' kW';
+    document.getElementById('parkDelta').textContent = '−' + fmt(dT_park, 1) + ' °C';
+    document.getElementById('nearDelta').textContent = '−' + fmt(Math.min(dT_near_capped,6), 1) + ' °C';
+    document.getElementById('treeDelta').textContent = treePct > 0
+      ? '−' + fmt(dT_tree_zone, 1) + ' °C (in canopy zone)'
+      : 'no trees';
+    document.getElementById('coolRadius').textContent = fmt(Math.min(coolRadius, 80), 0) + ' m';
+
+    // Temp markers
+    document.getElementById('noParkTemp').textContent = fmt(T_nopark, 1) + '°';
+    document.getElementById('parkEdgeTemp').textContent = fmt(T_parkedge, 1) + '°';
+    document.getElementById('nearStreamTemp').textContent = fmt(T_nearstream, 1) + '°';
+    document.getElementById('atStreamTemp').textContent = fmt(T_atstream, 1) + '°';
+
+    // Viz: stream
+    const streamViz = document.getElementById('streamViz');
+    const streamPct = W / Math.sqrt(A_park) * 100;
+    const vizWidth = Math.max(4, Math.min(streamPct * 3, 20));
+    streamViz.style.left = (50 - vizWidth/2) + '%';
+    streamViz.style.width = vizWidth + '%';
+
+    // Cool halo
+    const halo = document.getElementById('coolHalo');
+    const haloPct = Math.min(coolRadius / Math.sqrt(A_park) * 100, 50);
+    halo.style.left = (50 - haloPct) + '%';
+    halo.style.width = (haloPct * 2) + '%';
+
+    // Heat overlay
+    const heatOverlay = document.getElementById('heatOverlay');
+    const heatAlpha = Math.min((T - 15) / 30, 0.35) * (1 - treePct * 0.5);
+    heatOverlay.style.background = `rgba(200, 80, 0, ${heatAlpha})`;
+
+    // Tree layer viz
+    const treeLayer = document.getElementById('treeLayer');
+    treeLayer.style.left = (50 - vizWidth/2 - 15) + '%';
+    treeLayer.style.width = (vizWidth + 30) + '%';
+    treeLayer.style.opacity = treePct;
+    // Number of tree emojis based on coverage
+    const treeCount = Math.round(treePct * 8);
+    treeLayer.textContent = '🌳'.repeat(treeCount);
+  }
+
+  Object.values(inputs).forEach(inp => inp.addEventListener('input', calculate));
+  calculate();
+</script>
+</body>
+</html>
